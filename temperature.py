@@ -33,10 +33,10 @@ class Sensor():
 
     def __str__(self):
         if self.raw_data:
-            fmt = "Fahrenheit: {:f}, Celsius: {:f}"
-            return fmt.format(self.fahrenheit, self.celsius)
+            data = "{:10f}°F {:10f}°C".format(self.fahrenheit, self.celsius)
         else:
-            return "<Sensor: No Data>"
+            data = "No Data"
+        return "<Sensor {}: {}>".format(self.id, data)
 
 if __name__ == "__main__":
     s = Sensor();
@@ -49,5 +49,5 @@ if __name__ == "__main__":
         fahr += s.fahrenheit
         celsius += s.celsius
     print("\nAverage:")
-    print("  Fahrenheit: {:5.2f}".format(fahr/count))
-    print("  Celsius:    {:5.2f}".format(celsius/count))
+    print("{:8.2f}°F".format(fahr/count))
+    print("{:8.2f}°C".format(celsius/count))

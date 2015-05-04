@@ -39,6 +39,13 @@ class Sensor():
 if __name__ == "__main__":
     s = Sensor();
     print(s)
-    for i in range(5):
+    count = 5
+    fahr, celsius = (0,0)
+    for i in range(count):
         s.get_temp()
         print(s)
+        fahr += s.fahrenheit
+        celsius += s.celsius
+    print("Average:")
+    print("  Fahrenheit:", fahr/count)
+    print("  Celsius:", celsius/count)

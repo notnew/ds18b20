@@ -11,9 +11,7 @@ class Sensor():
         self.id = id or Sensor.list_devices()[0]
         self.path = os.path.join(Sensor.base_device_path, self.id, 'w1_slave')
         self.file = open(self.path)
-
-        self.celsius = "unset"
-        self.fahrenheit = "unset"
+        self.raw_data = None
 
     def get_temp(self):
         self.file.seek(0)
@@ -34,7 +32,11 @@ class Sensor():
         self.fahrenheit = fahrenheit
 
     def __str__(self):
-        return "Fahrenheit: {}, Celsius: {}".format(self.fahrenheit, self.celsius)
+        if self.raw_data:
+            fmt = "Fahrenheit: {:f}, Celsius: {:f}"
+            return fmt.format(self.fahrenheit, self.celsius)
+        else:
+            return "<Sensor: No Data>"
 
 if __name__ == "__main__":
     s = Sensor();
@@ -46,6 +48,6 @@ if __name__ == "__main__":
         print(s)
         fahr += s.fahrenheit
         celsius += s.celsius
-    print("Average:")
-    print("  Fahrenheit:", fahr/count)
-    print("  Celsius:", celsius/count)
+    print("\nAverage:")
+    print("  Fahrenheit: {:5.2f}".format(fahr/count))
+    print("  Celsius:    {:5.2f}".format(celsius/count))

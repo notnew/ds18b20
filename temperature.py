@@ -1,4 +1,5 @@
 import os
+import time
 
 class Sensor():
     # static method and data
@@ -48,6 +49,7 @@ if __name__ == "__main__":
         print(s)
         fahr += s.fahrenheit
         celsius += s.celsius
-    print("\nAverage:")
+    (year, month, day, hour, minute, sec, wday, yday, isdst) = time.localtime()
+    print("\nAverage: ({:02}:{:02}:{:02})".format(hour,minute,sec))
     print("{:8.2f}°F".format(fahr/count))
     print("{:8.2f}°C".format(celsius/count))

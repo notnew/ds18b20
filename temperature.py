@@ -1,16 +1,16 @@
 import os
 import time
 
-class Sensor():
+class DS18B20():
     # static method and data
     base_device_path = "/sys/bus/w1/devices/"
     def list_devices():
-        devices = os.listdir(Sensor.base_device_path)
+        devices = os.listdir(DS18B20.base_device_path)
         return [d for d in devices if not d.startswith("w1_bus_master")]
 
     def __init__(self, id=None):
-        self.id = id or Sensor.list_devices()[0]
-        self.path = os.path.join(Sensor.base_device_path, self.id, 'w1_slave')
+        self.id = id or DS18B20.list_devices()[0]
+        self.path = os.path.join(DS18B20.base_device_path, self.id, 'w1_slave')
         self.file = open(self.path)
         self.raw_data = None
 
@@ -37,10 +37,10 @@ class Sensor():
             data = "{:10f}°F {:10f}°C".format(self.fahrenheit, self.celsius)
         else:
             data = "No Data"
-        return "<Sensor {}: {}>".format(self.id, data)
+        return "<DS18B20 {}: {}>".format(self.id, data)
 
 if __name__ == "__main__":
-    s = Sensor();
+    s = DS18B20();
     print(s)
     count = 5
     fahr, celsius = (0,0)

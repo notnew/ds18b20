@@ -8,16 +8,23 @@ class Tracker():
     """ Track the temperature over time, keeping a history of the data """
 
     def __init__(self, listen_port=9901):
+        self.minimum_period = 5
+
         self.seconds = History(100, 1)
         self.minutes = History(100, 60)
+        self.five_minutes = History(12*24*5, 60 * 5)
         self.half_hours = History(None, 60 * 30)
 
         self._sensor = DS18B20()
 
         self.port = int(listen_port)
         self.listen_socket = None
+        self.running = False
 
     def start(self):
+        _sampler_thread = threading.Thread(target=self._sampler)
+        _sampler_thread.start()
+
         listen_socket = socket.socket()
         listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listen_socket.bind(("0.0.0.0", self.port))
@@ -67,8 +74,16 @@ class Tracker():
         if self.listen_socket:
             self.listen_socket.close()
         self.listen_socket = None
+        self.running = False
 
-    def get_sample(self):
+    def _sampler(self):
+        self.running = True
+        while self.running:
+            self._get_sample()
+            time.sleep(self.minimum_period)
+        print("_sampler ended")
+
+    def _get_sample(self):
         total = 0.0
         count = 3
         for i in range(count):
@@ -77,6 +92,7 @@ class Tracker():
         sample = Sample(total/count)
         self.seconds.add_sample(sample)
         self.minutes.add_sample(sample)
+        self.five_minutes.add_sample(sample)
         self.half_hours.add_sample(sample)
 
 class History():
@@ -153,10 +169,11 @@ if __name__ == "__main__":
     t = tracker
     # t.seconds._data = [Sample(i, t=0.0) for i in range(200)]
     for i in range(4):
-        t.get_sample()
+        t._get_sample()
         print(t.seconds)
         print(t.seconds[-1])
-        print(t.minutes[-1])
+        print(t.minutes)
+        print(t.five_minutes[-1])
         print(t.half_hours[-1])
     try:
         t.start()

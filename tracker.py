@@ -7,7 +7,7 @@ class Tracker():
     def __init__(self):
         self.seconds = History(100, 1)
         self.minutes = History(100, 60)
-        self.half_hours = History(100, 1800)
+        self.half_hours = History(None, 60 * 30)
 
         self._sensor = DS18B20()
 
@@ -29,7 +29,18 @@ class History():
             period is the time in seconds between samples
         """
         self.init_time = time.time()
-        self.count = int(count)
+        if count is None:
+            self.count = None
+        else:
+            value_err = ValueError(count,
+                                   "Count must be a positive integer or None")
+            try:
+                if int(count) <= 0:
+                    raise value_err
+            except ValueError as err:
+                raise value_err from err
+
+        self.count = int(count) if count else None
         self.period = float(period)
         self._data = []
 
@@ -43,15 +54,19 @@ class History():
     def add_sample(self, sample):
         """ add the sample to history if enough time has elapsed
             otherwise do nothing """
+
         adjusted_time = sample.time - self.init_time
         adjusted_sample = Sample(value = sample.value, t = adjusted_time)
+
         if not self._sample_due(adjusted_sample):
             return
-        if len(self._data) < self.count:
+
+        if self.count is None or len(self) < self.count:
             self._data.append(adjusted_sample)
         else:
-            self._data = self._data[1:]
             self._data.append(adjusted_sample)
+            self._data = self._data[-self.count:]
+
 
     def __str__(self):
         return "<History: {}>".format(self._data)
@@ -62,10 +77,13 @@ class History():
     def __getitem__(self, i):
         return self._data[i]
 
+    def __len__(self):
+        return len(self._data)
+
 class Sample():
     def __init__(self, value, t=None):
         self.value = value
-        self.time = t or time.time()
+        self.time = time.time() if t is None else float(t)
 
     def __repr__(self):
         return str(self)
@@ -77,6 +95,7 @@ if __name__ == "__main__":
     print(Sample("hello"))
     tracker = Tracker()
     t = tracker
+    # t.seconds._data = [Sample(i, t=0.0) for i in range(200)]
     for i in range(4):
         t.get_sample()
         print(t.seconds)

@@ -28,6 +28,7 @@ class History():
         """ count is an integer for a fixed length buffer or None for unlimited
             period is the time in seconds between samples
         """
+        self.init_time = time.time()
         self.count = int(count)
         self.period = float(period)
         self._data = []
@@ -42,13 +43,15 @@ class History():
     def add_sample(self, sample):
         """ add the sample to history if enough time has elapsed
             otherwise do nothing """
-        if not self._sample_due(sample):
+        adjusted_time = sample.time - self.init_time
+        adjusted_sample = Sample(value = sample.value, t = adjusted_time)
+        if not self._sample_due(adjusted_sample):
             return
         if len(self._data) < self.count:
-            self._data.append(sample)
+            self._data.append(adjusted_sample)
         else:
             self._data = self._data[1:]
-            self._data.append(sample)
+            self._data.append(adjusted_sample)
 
     def __str__(self):
         return "<History: {}>".format(self._data)

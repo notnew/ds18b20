@@ -1,15 +1,72 @@
 from ds18b20 import DS18B20
+import socket
+import threading
 import time
+
 
 class Tracker():
     """ Track the temperature over time, keeping a history of the data """
 
-    def __init__(self):
+    def __init__(self, listen_port=9901):
         self.seconds = History(100, 1)
         self.minutes = History(100, 60)
         self.half_hours = History(None, 60 * 30)
 
         self._sensor = DS18B20()
+
+        self.port = int(listen_port)
+        self.listen_socket = None
+
+    def start(self):
+        listen_socket = socket.socket()
+        listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listen_socket.bind(("0.0.0.0", self.port))
+        listen_socket.listen(1)
+        self.listen_socket = listen_socket
+
+        while True:
+            print("waiting for a connetion...")
+            (sock,_) = self.listen_socket.accept()
+
+            thread = threading.Thread(target=self.serve, args=(sock,))
+            thread.start()
+
+    def serve(self, sock):
+        try:
+            (addr, port) = sock.getpeername()
+            peer_name = "{}:{}".format(addr,port)
+            print("Accepted a connection from", peer_name)
+
+            current_thread = threading.current_thread()
+            new_name = "{} ({})".format(current_thread.name, peer_name)
+            current_thread.name =  new_name
+
+            while True:
+                request = sock.recv(100)
+                if request:
+                    response = self.respond(request)
+                    sock.send(response.encode("utf-8"))
+                else:
+                    break
+
+        except socket.error as err:
+            # ignore errno == 104, "Connection reset by peer"
+            if err.errno == 104:
+                print("client", peer_name, "closed before recieving all data")
+            else:
+                raise err
+        finally:
+            sock.close()
+            print("closed connection for", peer_name)
+
+    def respond(self, request):
+        if request == b"latest":
+            return str(self.seconds[-1])
+
+    def stop(self):
+        if self.listen_socket:
+            self.listen_socket.close()
+        self.listen_socket = None
 
     def get_sample(self):
         total = 0.0
@@ -67,7 +124,6 @@ class History():
             self._data.append(adjusted_sample)
             self._data = self._data[-self.count:]
 
-
     def __str__(self):
         return "<History: {}>".format(self._data)
 
@@ -102,3 +158,7 @@ if __name__ == "__main__":
         print(t.seconds[-1])
         print(t.minutes[-1])
         print(t.half_hours[-1])
+    try:
+        t.start()
+    finally:
+        t.stop()

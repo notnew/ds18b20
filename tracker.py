@@ -19,9 +19,10 @@ class Tracker():
 
         self.port = int(listen_port)
         self.listen_socket = None
-        self.running = False
+        self.stopping = threading.Event()
 
     def start(self):
+        self.stopping.clear()
         _sampler_thread = threading.Thread(target=self._sampler)
         _sampler_thread.start()
 
@@ -71,16 +72,14 @@ class Tracker():
             return str(self.seconds[-1])
 
     def stop(self):
+        self.stopping.set()
         if self.listen_socket:
             self.listen_socket.close()
         self.listen_socket = None
-        self.running = False
 
     def _sampler(self):
-        self.running = True
-        while self.running:
+        while not self.stopping.wait(self.minimum_period):
             self._get_sample()
-            time.sleep(self.minimum_period)
         print("_sampler ended")
 
     def _get_sample(self):

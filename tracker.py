@@ -5,18 +5,18 @@ class Tracker():
     """ Track the temperature over time, keeping a history of the data """
 
     def __init__(self):
-        self.sensor = DS18B20()
-        self.buffer_count = 200
         self.seconds = History(100, 1)
         self.minutes = History(100, 60)
         self.half_hours = History(100, 1800)
+
+        self._sensor = DS18B20()
 
     def get_sample(self):
         total = 0.0
         count = 3
         for i in range(count):
-            self.sensor.get_temp()
-            total += self.sensor.fahrenheit
+            self._sensor.get_temp()
+            total += self._sensor.fahrenheit
         sample = Sample(total/count)
         self.seconds.add_sample(sample)
         self.minutes.add_sample(sample)

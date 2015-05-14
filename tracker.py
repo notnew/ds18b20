@@ -6,12 +6,38 @@ import time
 
 class TemperatureRH (BaseHTTPRequestHandler):
     def do_GET(self):
+        request = self.path.split("/")[1] or "bare_temp"
+
+        if request == "bare_temp":
+            self.bare_temp()
+        elif request == "minutes":
+            self.minutes()
+        else:
+            self.bad_request()
+
+    def bare_temp(self):
         latest = self.server.latest
         response = "{}\n".format(latest).encode("utf-8")
+        length = len(response)
 
         self.send_response(200, "ok")
+        self.send_header("Content-Length", length)
         self.end_headers()
         self.wfile.write(response)
+
+    def minutes(self):
+        data = str(self.server.minutes).encode("utf-8")
+        length = len(data)
+
+        self.send_response(200, "ok")
+        self.send_header("Content-Length", length)
+        self.end_headers()
+        self.wfile.write(data)
+
+    def bad_request(self):
+        self.send_response(400, "Bad Request")
+        self.end_headers()
+
 
 class Tracker(HTTPServer):
     """ Track the temperature over time, keeping a history of the data """

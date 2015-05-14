@@ -1,5 +1,6 @@
 from ds18b20 import DS18B20
 from http.server import HTTPServer, BaseHTTPRequestHandler
+import pickle
 import socket
 import threading
 import time
@@ -10,8 +11,8 @@ class TemperatureRH (BaseHTTPRequestHandler):
 
         if request == "bare_temp":
             self.bare_temp()
-        elif request == "minutes":
-            self.minutes()
+        elif request in self.server.histories:
+            self.send_server_attribute(request)
         else:
             self.bad_request()
 
@@ -25,12 +26,14 @@ class TemperatureRH (BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response)
 
-    def minutes(self):
-        data = str(self.server.minutes).encode("utf-8")
+    def send_server_attribute(self, name):
+        value = self.server.__dict__[name]
+        data = pickle.dumps(value)
         length = len(data)
 
         self.send_response(200, "ok")
         self.send_header("Content-Length", length)
+        self.send_header("Content-Type", "application/python-pickle")
         self.end_headers()
         self.wfile.write(data)
 
@@ -52,6 +55,7 @@ class Tracker(HTTPServer):
         self.minutes = History(100, 60)
         self.five_minutes = History(12*24*5, 60 * 5)
         self.half_hours = History(None, 60 * 30)
+        self.histories = ["seconds", "minutes", "five_minutes", "half_hours"]
 
         self._sensor = DS18B20()
         self.stopping_ev = threading.Event()

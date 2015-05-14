@@ -1,84 +1,39 @@
 from ds18b20 import DS18B20
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import socket
 import threading
 import time
 
+class TemperatureRH (BaseHTTPRequestHandler):
+    def do_GET(self):
+        latest = self.server.latest
+        response = "{}\n".format(latest).encode("utf-8")
 
-class Tracker():
+        self.send_response(200, "ok")
+        self.end_headers()
+        self.wfile.write(response)
+
+class Tracker(HTTPServer):
     """ Track the temperature over time, keeping a history of the data """
 
-    def __init__(self, listen_port=9901):
+    def __init__(self, port=9901, server_address=('', 9901)):
+        super().__init__(server_address, TemperatureRH)
+
         self.minimum_period = 5
 
+        self.latest = "No data"
         self.seconds = History(100, 1)
         self.minutes = History(100, 60)
         self.five_minutes = History(12*24*5, 60 * 5)
         self.half_hours = History(None, 60 * 30)
 
         self._sensor = DS18B20()
-
-        self.port = int(listen_port)
-        self.listen_socket = None
-        self.stopping = threading.Event()
-
-    def start(self):
-        self.stopping.clear()
-        _sampler_thread = threading.Thread(target=self._sampler)
-        _sampler_thread.start()
-
-        listen_socket = socket.socket()
-        listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listen_socket.bind(("0.0.0.0", self.port))
-        listen_socket.listen(1)
-        self.listen_socket = listen_socket
-
-        while True:
-            print("waiting for a connetion...")
-            (sock,_) = self.listen_socket.accept()
-
-            thread = threading.Thread(target=self.serve, args=(sock,))
-            thread.start()
-
-    def serve(self, sock):
-        try:
-            (addr, port) = sock.getpeername()
-            peer_name = "{}:{}".format(addr,port)
-            print("Accepted a connection from", peer_name)
-
-            current_thread = threading.current_thread()
-            new_name = "{} ({})".format(current_thread.name, peer_name)
-            current_thread.name =  new_name
-
-            while True:
-                request = sock.recv(100)
-                if request:
-                    response = self.respond(request)
-                    sock.send(response.encode("utf-8"))
-                else:
-                    break
-
-        except socket.error as err:
-            # ignore errno == 104, "Connection reset by peer"
-            if err.errno == 104:
-                print("client", peer_name, "closed before recieving all data")
-            else:
-                raise err
-        finally:
-            sock.close()
-            print("closed connection for", peer_name)
-
-    def respond(self, request):
-        if request == b"latest":
-            return str(self.seconds[-1])
-
-    def stop(self):
-        self.stopping.set()
-        if self.listen_socket:
-            self.listen_socket.close()
-        self.listen_socket = None
+        self.stopping_ev = threading.Event()
 
     def _sampler(self):
-        while not self.stopping.wait(self.minimum_period):
+        print("_sampler started")
+        self._get_sample()
+        while not self.stopping_ev.wait(self.minimum_period):
             self._get_sample()
         print("_sampler ended")
 
@@ -89,10 +44,18 @@ class Tracker():
             self._sensor.get_temp()
             total += self._sensor.fahrenheit
         sample = Sample(total/count)
+        self.latest = "{} {}".format(sample.value, time.ctime(sample.time))
         self.seconds.add_sample(sample)
         self.minutes.add_sample(sample)
         self.five_minutes.add_sample(sample)
         self.half_hours.add_sample(sample)
+
+    def start_sampler(self):
+        self.stopping_ev.clear()
+        threading.Thread(target=self._sampler).start()
+
+    def stop_sampler(self):
+        self.stopping_ev.set()
 
 class History():
     """ a history of temperature samples """
@@ -162,19 +125,10 @@ class Sample():
         return "({:.2f}, {})".format(self.time, self.value)
 
 if __name__ == "__main__":
-    print(Sample(4))
-    print(Sample("hello"))
-    tracker = Tracker()
-    t = tracker
-    # t.seconds._data = [Sample(i, t=0.0) for i in range(200)]
-    for i in range(4):
-        t._get_sample()
-        print(t.seconds)
-        print(t.seconds[-1])
-        print(t.minutes)
-        print(t.five_minutes[-1])
-        print(t.half_hours[-1])
+    httpd = Tracker()
+    httpd.start_sampler()
     try:
-        t.start()
+        print("starting server...")
+        httpd.serve_forever()
     finally:
-        t.stop()
+        httpd.stop_sampler()

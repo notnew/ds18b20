@@ -7,28 +7,31 @@ import time
 
 class TemperatureRH (BaseHTTPRequestHandler):
     def do_GET(self):
-        request = self.path.split("/")[1] or "bare_temp"
+        request = self.path.split("/")[1]
 
-        if request == "bare_temp":
-            self.bare_temp()
+        if request in ["temp", "", "temp_str"]:
+            self.temp_str()
+        elif request == "latest":
+            latest = self.server.latest
+            self.send_pickled(latest)
         elif request in self.server.histories.keys():
-            self.send_server_history(request)
+            history = self.server.histories[request]
+            self.send_pickled(history)
         else:
             self.bad_request()
 
-    def bare_temp(self):
+    def temp_str(self):
         latest = self.server.latest
-        response = "{}\n".format(latest).encode("utf-8")
-        length = len(response)
+        temperature = "{}\n".format(latest.value).encode("utf-8")
+        length = len(temperature)
 
         self.send_response(200, "ok")
         self.send_header("Content-Length", length)
         self.end_headers()
-        self.wfile.write(response)
+        self.wfile.write(temperature)
 
-    def send_server_history(self, name):
-        history = self.server.histories[name]
-        data = pickle.dumps(history)
+    def send_pickled(self, value):
+        data = pickle.dumps(value)
         length = len(data)
 
         self.send_response(200, "ok")
@@ -51,7 +54,7 @@ class Tracker(HTTPServer):
 
         self.minimum_period = minimum_period
 
-        self.latest = "No data"
+        self.latest = Sample("No data")
         self.histories = histories
 
         self._sensor = DS18B20()
@@ -67,13 +70,13 @@ class Tracker(HTTPServer):
     def _get_sample(self):
         total = 0.0
         count = 3
+
         for i in range(count):
             self._sensor.get_temp()
             total += self._sensor.fahrenheit
         sample = Sample(total/count)
 
-        self.latest = "{} {}".format(sample.value, time.ctime(sample.time))
-
+        self.latest = sample
         for history in self.histories.values():
             history.add_sample(sample)
 

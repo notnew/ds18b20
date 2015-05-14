@@ -11,8 +11,8 @@ class TemperatureRH (BaseHTTPRequestHandler):
 
         if request == "bare_temp":
             self.bare_temp()
-        elif request in self.server.histories:
-            self.send_server_attribute(request)
+        elif request in self.server.histories.keys():
+            self.send_server_history(request)
         else:
             self.bad_request()
 
@@ -26,9 +26,9 @@ class TemperatureRH (BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response)
 
-    def send_server_attribute(self, name):
-        value = self.server.__dict__[name]
-        data = pickle.dumps(value)
+    def send_server_history(self, name):
+        history = self.server.histories[name]
+        data = pickle.dumps(history)
         length = len(data)
 
         self.send_response(200, "ok")
@@ -45,17 +45,14 @@ class TemperatureRH (BaseHTTPRequestHandler):
 class Tracker(HTTPServer):
     """ Track the temperature over time, keeping a history of the data """
 
-    def __init__(self, port=9901, server_address=('', 9901)):
+    def __init__(self, port=9901, server_address=('', 9901), histories={},
+                 minimum_period = 60):
         super().__init__(server_address, TemperatureRH)
 
-        self.minimum_period = 5
+        self.minimum_period = minimum_period
 
         self.latest = "No data"
-        self.seconds = History(100, 1)
-        self.minutes = History(100, 60)
-        self.five_minutes = History(12*24*5, 60 * 5)
-        self.half_hours = History(None, 60 * 30)
-        self.histories = ["seconds", "minutes", "five_minutes", "half_hours"]
+        self.histories = histories
 
         self._sensor = DS18B20()
         self.stopping_ev = threading.Event()
@@ -74,11 +71,11 @@ class Tracker(HTTPServer):
             self._sensor.get_temp()
             total += self._sensor.fahrenheit
         sample = Sample(total/count)
+
         self.latest = "{} {}".format(sample.value, time.ctime(sample.time))
-        self.seconds.add_sample(sample)
-        self.minutes.add_sample(sample)
-        self.five_minutes.add_sample(sample)
-        self.half_hours.add_sample(sample)
+
+        for history in self.histories.values():
+            history.add_sample(sample)
 
     def start_sampler(self):
         self.stopping_ev.clear()
@@ -155,7 +152,12 @@ class Sample():
         return "({:.2f}, {})".format(self.time, self.value)
 
 if __name__ == "__main__":
-    httpd = Tracker()
+    histories = {"seconds": History(100, 1),
+                 "minutes": History(100, 60),
+                 "five_minutes": History(12*24*5, 60*5),
+                 "half_hours": History(None, 60*30) }
+
+    httpd = Tracker(histories=histories, minimum_period=1)
     httpd.start_sampler()
     try:
         print("starting server...")

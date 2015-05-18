@@ -62,11 +62,12 @@ class Tracker():
 
         self._sensor = DS18B20()
         self.stopping_ev = threading.Event()
+        self._sampling_time = 0
 
     def _sampler(self):
         print("_sampler started")
         self._get_sample()
-        while not self.stopping_ev.wait(self.minimum_period):
+        while not self.stopping_ev.wait(self.minimum_period-self._sampling_time):
             self._get_sample()
         print("_sampler ended")
 
@@ -74,9 +75,12 @@ class Tracker():
         total = 0.0
         count = 3
 
+        start_time = time.time()
         for i in range(count):
             self._sensor.get_temp()
             total += self._sensor.fahrenheit
+        end_time = time.time()
+        self._sampling_time = end_time - start_time
         sample = Sample(total/count)
 
         self.latest = sample
@@ -158,7 +162,7 @@ if __name__ == "__main__":
                  "five_minutes": History(12*24*5, 60*5),
                  "half_hours": History(None, 60*30) }
 
-    tracker = Tracker(histories=histories, minimum_period=1)
+    tracker = Tracker(histories=histories, minimum_period=10)
     tracker.start_sampler()
     httpd = Server(tracker=tracker)
     try:

@@ -1,6 +1,9 @@
 import os
 import time
 
+def pp_temperature(temp, scale='F'):
+    return "{:0.2f}°{}".format(temp, scale)
+
 class DS18B20():
     # static method and data
     base_device_path = "/sys/bus/w1/devices/"
@@ -51,5 +54,5 @@ if __name__ == "__main__":
         celsius += s.celsius
     (year, month, day, hour, minute, sec, wday, yday, isdst) = time.localtime()
     print("\nAverage: ({:02}:{:02}:{:02})".format(hour,minute,sec))
-    print("{:8.2f}°F".format(fahr/count))
-    print("{:8.2f}°C".format(celsius/count))
+    print("  ", pp_temperature(fahr/count))
+    print("  ", pp_temperature(celsius/count, "C"))

@@ -1,6 +1,7 @@
 from ds18b20 import DS18B20
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import pickle
+import queue
 import socket
 import threading
 import time
@@ -54,7 +55,7 @@ class Server(HTTPServer):
 class Tracker():
     """ Track the temperature over time, keeping a history of the data """
 
-    def __init__(self,  histories={}, minimum_period = 60):
+    def __init__(self,  histories={}, minimum_period = 60, sample_q=None):
         self.minimum_period = minimum_period
 
         self.latest = Sample("No data")
@@ -63,6 +64,7 @@ class Tracker():
         self._sensor = DS18B20()
         self.stopping_ev = threading.Event()
         self._sampling_time = 0
+        self.sample_q = sample_q or queue.Queue()
 
     def _sampler(self):
         print("_sampler started")
@@ -84,8 +86,12 @@ class Tracker():
         sample = Sample(total/count)
 
         self.latest = sample
+        was_updated = False
         for history in self.histories.values():
-            history.add_sample(sample)
+            if history.add_sample(sample):
+                was_updated = True
+        if was_updated:
+            self.sample_q.put(sample)
 
     def start_sampler(self):
         self.stopping_ev.clear()
@@ -123,16 +129,18 @@ class History():
 
 
     def add_sample(self, sample):
-        """ add the sample to history if enough time has elapsed
-            otherwise do nothing """
+        """ if enough time has elapsed, add the sample to history, return True
+            otherwise do nothing and return False
+        """
         if not self._sample_due(sample):
-            return
+            return False
 
         if self.count is None or len(self) < self.count:
             self._data.append(sample)
         else:
             self._data.append(sample)
             self._data = self._data[-self.count:]
+        return True
 
     def __str__(self):
         return "<History: {}>".format(self._data)

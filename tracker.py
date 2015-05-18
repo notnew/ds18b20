@@ -9,19 +9,20 @@ class TemperatureRH (BaseHTTPRequestHandler):
     def do_GET(self):
         request = self.path.split("/")[1]
 
+        tracker = self.server.tracker
         if request in ["temp", "", "temp_str"]:
             self.temp_str()
         elif request == "latest":
-            latest = self.server.latest
+            latest = tracker.latest
             self.send_pickled(latest)
-        elif request in self.server.histories.keys():
-            history = self.server.histories[request]
+        elif request in tracker.histories.keys():
+            history = tracker.histories[request]
             self.send_pickled(history)
         else:
             self.bad_request()
 
     def temp_str(self):
-        latest = self.server.latest
+        latest = tracker.latest
         temperature = "{}\n".format(latest.value).encode("utf-8")
         length = len(temperature)
 
@@ -44,14 +45,15 @@ class TemperatureRH (BaseHTTPRequestHandler):
         self.send_response(400, "Bad Request")
         self.end_headers()
 
-
-class Tracker(HTTPServer):
-    """ Track the temperature over time, keeping a history of the data """
-
-    def __init__(self, port=9901, server_address=('', 9901), histories={},
-                 minimum_period = 60):
+class Server(HTTPServer):
+    def __init__(self, port=9901, server_address=('', 9901), tracker=None):
+        self.tracker = tracker
         super().__init__(server_address, TemperatureRH)
 
+class Tracker():
+    """ Track the temperature over time, keeping a history of the data """
+
+    def __init__(self,  histories={}, minimum_period = 60):
         self.minimum_period = minimum_period
 
         self.latest = Sample("No data")
@@ -155,10 +157,11 @@ if __name__ == "__main__":
                  "five_minutes": History(12*24*5, 60*5),
                  "half_hours": History(None, 60*30) }
 
-    httpd = Tracker(histories=histories, minimum_period=1)
-    httpd.start_sampler()
+    tracker = Tracker(histories=histories, minimum_period=1)
+    tracker.start_sampler()
+    httpd = Server(tracker=tracker)
     try:
         print("starting server...")
         httpd.serve_forever()
     finally:
-        httpd.stop_sampler()
+        tracker.stop_sampler()

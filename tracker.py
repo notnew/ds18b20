@@ -7,7 +7,8 @@ import time
 
 class TemperatureRH (BaseHTTPRequestHandler):
     def do_GET(self):
-        request = self.path.split("/")[1]
+        path = self.path.replace("http://", "")
+        request = path.split("/")[1]
 
         tracker = self.server.tracker
         if request in ["temp", "", "temp_str"]:

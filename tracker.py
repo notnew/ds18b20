@@ -1,4 +1,9 @@
-from ds18b20 import DS18B20
+# hack to import DS18B20 whether module is executed as script or not
+if __name__ == "__main__":
+    from ds18b20 import DS18B20
+else:
+    from .ds18b20 import DS18B20
+
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import pickle
 import queue

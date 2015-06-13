@@ -166,8 +166,12 @@ class Sample():
 
     def __repr__(self):
         return str(self)
+
     def __str__(self):
         return "({:.2f}, {})".format(self.time, self.value)
+
+    def __iter__(self):
+        return iter((self.time, self.value))
 
 if __name__ == "__main__":
     histories = {"seconds": History(100, 1),

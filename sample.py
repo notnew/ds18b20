@@ -30,12 +30,24 @@ class Sampler():
         self._sensor = DS18B20()
         self._thread = None
         self._stop_event = threading.Event()
+        self._sampling_time = 0           # how long it takes to read sensor
+        self._timeout = self.period  - self._sampling_time
 
     def run(self):
+        def _read_sample():
+            start_time = time.time()
+            self._sensor.get_temp()
+            end_time = time.time()
+
+            self._sampling_time = end_time - start_time
+            self._timeout = self.period - self._sampling_time
+
+            return self._sensor.fahrenheit
+
         def _run():
-            while not self._stop_event.wait(self.period):
-                self._sensor.get_temp()
-                samp = Sample(self._sensor.fahrenheit)
+            self._timeout = self.period - self._sampling_time
+            while not self._stop_event.wait(self._timeout):
+                samp = Sample(_read_sample())
                 self.sample_q.put(samp)
 
         if not self.is_running():

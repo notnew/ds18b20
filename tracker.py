@@ -4,6 +4,8 @@ if __name__ == "__main__":
 else:
     from .ds18b20 import DS18B20
 
+from sample import Sample
+
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import pickle
 import queue
@@ -158,20 +160,6 @@ class History():
 
     def __len__(self):
         return len(self._data)
-
-class Sample():
-    def __init__(self, value, t=None):
-        self.value = value
-        self.time = time.time() if t is None else float(t)
-
-    def __repr__(self):
-        return str(self)
-
-    def __str__(self):
-        return "({:.2f}, {})".format(self.time, self.value)
-
-    def __iter__(self):
-        return iter((self.time, self.value))
 
 if __name__ == "__main__":
     histories = {"seconds": History(100, 1),

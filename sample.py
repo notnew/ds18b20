@@ -63,11 +63,55 @@ class Sampler():
     def is_running(self):
         return self._thread and self._thread.is_alive()
 
+class SmoothSampler():
+    """ average sevaral readings to get sample """
+    def __init__(self, count, period, sample_q=None):
+        self.count = count
+        self.period = period
+        self.sample_q = sample_q or queue.Queue()
+
+        self._raw_sampler = Sampler(period=self.period/self.count)
+        self._thread = None
+
+    def run(self):
+        def _run():
+            self._raw_sampler.run()
+
+            total = 0
+            sample_count = 0
+            raw_q = self._raw_sampler.sample_q
+
+            try:
+                for sample in  (iter(raw_q.get, None)):
+                    total += sample.value
+                    sample_count += 1
+                    if (sample_count >= self.count):
+                        averaged_sample = Sample(total/sample_count, sample.time)
+                        self.sample_q.put(averaged_sample)
+                        total = 0
+                        sample_count = 0
+
+            finally:
+                self._raw_sampler.stop()
+
+        if not self.is_running():
+            self._thread = threading.Thread(target=_run)
+            self._thread.start()
+
+    def stop(self):
+        if self.is_running():
+            raw_q = self._raw_sampler.sample_q
+            raw_q.put(None)
+            self._thread.join()
+
+    def is_running(self):
+        return self._thread and self._thread.is_alive()
+
 if __name__ == "__main__":
     print(Sample("test-now"))
     print(Sample("test-epoch", 0))
     q = queue.Queue()
-    sampler = Sampler(10, q)
+    sampler = SmoothSampler(3, 10, q)
     sampler.run()
     for x in range(5):
         (t, v) = q.get()
